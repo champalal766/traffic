@@ -1029,12 +1029,12 @@
                             </tbody>
                         </table>
                     </div>
-    
-                    <!-- Initial Plan Table -->
+
+                    <!-- Initial Pln Table -->
                     <div
                         class="table-container"
                         id="initialTableWrap"
-                        class="table-container is-hidden"
+                        class = "table-container is-hidden"
                     >
                         <table>
                             <thead>
@@ -1088,10 +1088,7 @@
                 const container = $("toastContainer");
                 const toastKey = `${type}:${title}:${message}`;
                 const now = Date.now();
-                if (
-                    toastKey === activeToastKey &&
-                    now - lastToastAt < 5000
-                )
+                if (toastKey === activeToastKey && now - lastToastAt < 5000)
                     return;
 
                 if (activeToast) {
@@ -1117,24 +1114,24 @@
   `;
 
                 const closeBtn = toast.querySelector(".toast-close");
-  closeBtn.onclick = () => removeToast();
+                closeBtn.onclick = () => removeToast();
 
-  activeToast = toast;
-  activeToastKey = toastKey;
-  lastToastAt = now;
-  container.appendChild(toast);
-  requestAnimationFrame(() => toast.classList.add("show"));
-  activeToastTimer = setTimeout(removeToast, 3200);
+                activeToast = toast;
+                activeToastKey = toastKey;
+                lastToastAt = now;
+                container.appendChild(toast);
+                requestAnimationFrame(() => toast.classList.add("show"));
+                activeToastTimer = setTimeout(removeToast, 3200);
             }
 
             function removeToast() {
-  if (!activeToast) return;
-  clearTimeout(activeToastTimer);
-  activeToast.classList.remove("show");
-  if (activeToast.parentNode) {
-      activeToast.parentNode.removeChild(activeToast);
-  }
-  activeToast = null;
+                if (!activeToast) return;
+                clearTimeout(activeToastTimer);
+                activeToast.classList.remove("show");
+                if (activeToast.parentNode) {
+                    activeToast.parentNode.removeChild(activeToast);
+                }
+                activeToast = null;
             }
 
             // Legacy message banner compatibility helper
@@ -1643,8 +1640,7 @@
                             const relativeY = y - ev.y;
                             const distance = Math.hypot(relativeX, relativeY);
                             const forwardDistance =
-                                relativeX * directionX +
-                                relativeY * directionY;
+                                relativeX * directionX + relativeY * directionY;
                             return (
                                 distance < 28 &&
                                 forwardDistance > -8 &&
@@ -1672,7 +1668,10 @@
                         const now = Date.now();
                         const width = canvas.clientWidth;
                         const height = canvas.clientHeight;
-                        if (!dashboardState || !Array.isArray(dashboardState.flowVehicles)) {
+                        if (
+                            !dashboardState ||
+                            !Array.isArray(dashboardState.flowVehicles)
+                        ) {
                             return false;
                         }
 
@@ -2140,12 +2139,12 @@
                         Math.max(0, (now - flow.startedAt) / duration),
                     );
                     const segKey1 = `${flow.source}-${flow.destination}`;
-                    const isYielding =
-                        activeEmergencyPathSegments.has(segKey1);
+                    const isYielding = activeEmergencyPathSegments.has(segKey1);
                     const routeMarked =
                         isYielding ||
                         dashboardState.emergencySegments?.includes(segKey1) ||
-                        dashboardState.emergencyDestination === flow.destination;
+                        dashboardState.emergencyDestination ===
+                            flow.destination;
                     // Marked flow vehicles clear the emergency corridor by
                     // continuing through it; freezing them creates a blockage.
                     const progress = progressNow;
