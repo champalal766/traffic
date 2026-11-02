@@ -1,0 +1,16 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Smart Traffic Management",
+			"type": "shell",
+			"command": "mvn",
+			"args": [
+				"spring-boot:run"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}

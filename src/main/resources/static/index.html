@@ -1,0 +1,2716 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Smart Traffic Control</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            :root {
+                --bg: #0f1117;
+                --card: #1a1f2e;
+                --card-hover: #22283a;
+                --border: #262d40;
+                --border-bright: #3b4664;
+                --text: #e2e8f0;
+                --text-muted: #8e9bb5;
+                --text-dim: #5c6882;
+                --accent: #3b82f6;
+                --accent-hover: #2563eb;
+                --accent-glow: rgba(59, 130, 246, 0.25);
+                --green: #10b981;
+                --green-glow: rgba(16, 185, 129, 0.25);
+                --red: #ef4444;
+                --red-glow: rgba(239, 68, 68, 0.3);
+                --amber: #f59e0b;
+                --yellow: #eab308;
+                --cyan: #06b6d4;
+                --font-main:
+                    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+                    Roboto, sans-serif;
+                --font-mono: "JetBrains Mono", monospace;
+            }
+
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            body {
+                background-color: var(--bg);
+                color: var(--text);
+                font-family: var(--font-main);
+                height: 100vh;
+                overflow: hidden;
+                -webkit-font-smoothing: antialiased;
+            }
+
+            /* Top-Level App Layout */
+            .app-container {
+                display: grid;
+                grid-template-columns: 60% 40%;
+                height: 100vh;
+                width: 100vw;
+                overflow: hidden;
+            }
+
+            /* Left Panel: Simulation Canvas */
+            .simulation-panel {
+                position: relative;
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+                background: #090b10;
+                border-right: 1px solid var(--border);
+                overflow: hidden;
+            }
+
+            .sim-topbar {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 12px 20px;
+                background: rgba(15, 17, 23, 0.9);
+                -webkit-backdrop-filter: blur(10px);
+                backdrop-filter: blur(10px);
+                border-bottom: 1px solid var(--border);
+                z-index: 10;
+            }
+
+            .sim-title-group {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+
+            .pulse-indicator {
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                background: var(--green);
+                box-shadow: 0 0 10px var(--green);
+                animation: pulseGreen 2s infinite;
+            }
+
+            @keyframes pulseGreen {
+                0% {
+                    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+                }
+                70% {
+                    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+                }
+                100% {
+                    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+                }
+            }
+
+            .sim-topbar h2 {
+                font-size: 0.95rem;
+                font-weight: 700;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                color: #cbd5e1;
+            }
+
+            .sim-legend {
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                font-size: 0.78rem;
+                color: var(--text-muted);
+            }
+
+            .legend-item {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .legend-dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 2px;
+            }
+
+            .legend-dot.normal {
+                background: #4b6584;
+            }
+            .legend-dot.emergency {
+                background: #ef4444;
+                box-shadow: 0 0 6px #ef4444;
+            }
+            .legend-dot.yield {
+                background: #ea580c;
+            }
+            .legend-dot.green {
+                background: #10b981;
+                border-radius: 50%;
+                box-shadow: 0 0 6px #10b981;
+            }
+
+            .canvas-viewport {
+                flex: 1;
+                position: relative;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                background: #090b10;
+            }
+
+            #cityCanvas {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                display: block;
+            }
+
+            .sim-bottom-bar {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 10px 20px;
+                background: rgba(15, 17, 23, 0.9);
+                border-top: 1px solid var(--border);
+                font-size: 0.78rem;
+                color: var(--text-muted);
+                z-index: 10;
+            }
+
+            /* Right Panel: Controls & Telemetry */
+            .controls-panel {
+                height: 100vh;
+                overflow-y: auto;
+                background: var(--bg);
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+                padding: 20px;
+            }
+
+            .controls-panel::-webkit-scrollbar {
+                width: 6px;
+            }
+            .controls-panel::-webkit-scrollbar-track {
+                background: var(--bg);
+            }
+            .controls-panel::-webkit-scrollbar-thumb {
+                background: var(--border-bright);
+                border-radius: 3px;
+            }
+
+            .is-hidden {
+                display: none;
+            }
+
+            /* Header Bar */
+            .brand-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding-bottom: 14px;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .brand-title {
+                display: flex;
+                flex-direction: column;
+                gap: 3px;
+            }
+
+            .brand-title h1 {
+                font-size: 1.25rem;
+                font-weight: 800;
+                letter-spacing: -0.02em;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                color: #fff;
+            }
+
+            .badge-pill {
+                font-size: 0.65rem;
+                font-weight: 700;
+                padding: 2px 7px;
+                border-radius: 9999px;
+                background: rgba(59, 130, 246, 0.15);
+                color: #60a5fa;
+                border: 1px solid rgba(59, 130, 246, 0.3);
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+            }
+
+            .brand-subtitle {
+                font-size: 0.78rem;
+                color: var(--text-muted);
+            }
+
+            .connection-status {
+                display: flex;
+                align-items: center;
+                gap: 7px;
+                font-size: 0.75rem;
+                padding: 5px 10px;
+                background: rgba(16, 185, 129, 0.1);
+                color: #34d399;
+                border: 1px solid rgba(16, 185, 129, 0.25);
+                border-radius: 20px;
+                font-family: var(--font-mono);
+            }
+
+            .connection-status.offline {
+                background: rgba(239, 68, 68, 0.1);
+                color: #f87171;
+                border-color: rgba(239, 68, 68, 0.25);
+            }
+
+            .status-dot {
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: currentColor;
+            }
+
+            /* Live Stats Row */
+            .stats-row {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
+            }
+
+            .stat-card {
+                background: var(--card);
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                padding: 12px 14px;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                transition: border-color 0.2s;
+            }
+
+            .stat-card:hover {
+                border-color: var(--border-bright);
+            }
+
+            .stat-label {
+                font-size: 0.7rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: var(--text-dim);
+                font-weight: 600;
+            }
+
+            .stat-value {
+                font-size: 1.35rem;
+                font-weight: 800;
+                font-family: var(--font-mono);
+                color: #fff;
+                display: flex;
+                align-items: baseline;
+                gap: 4px;
+            }
+
+            .stat-sub {
+                font-size: 0.7rem;
+                color: var(--text-muted);
+                font-weight: 400;
+                font-family: var(--font-main);
+            }
+
+            .stat-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                font-size: 0.72rem;
+                font-weight: 700;
+                padding: 2px 8px;
+                border-radius: 4px;
+            }
+
+            .stat-badge.normal {
+                background: rgba(16, 185, 129, 0.15);
+                color: #34d399;
+            }
+
+            .stat-badge.emergency-active {
+                background: rgba(239, 68, 68, 0.2);
+                color: #f87171;
+                animation: blinkRed 1s infinite;
+            }
+
+            .stat-badge.emergency-blocked {
+                background: rgba(234, 88, 12, 0.25);
+                color: #fdba74;
+                animation: blinkRed 0.65s infinite;
+            }
+
+            @keyframes blinkRed {
+                0%,
+                100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0.5;
+                }
+            }
+
+            /* Cards */
+            .card {
+                background: var(--card);
+                border: 1px solid var(--border);
+                border-radius: 12px;
+                padding: 16px 18px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .card-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .card-title {
+                font-size: 0.88rem;
+                font-weight: 700;
+                color: #f1f5f9;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .card-icon {
+                font-size: 1rem;
+            }
+
+            /* Forms & Controls */
+            .road-inputs {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+
+            .form-group {
+                display: flex;
+                flex-direction: column;
+                gap: 5px;
+            }
+
+            label {
+                font-size: 0.75rem;
+                font-weight: 600;
+                color: var(--text-muted);
+            }
+
+            input,
+            select {
+                background: #111522;
+                border: 1px solid var(--border);
+                color: var(--text);
+                padding: 9px 12px;
+                border-radius: 8px;
+                font-size: 0.84rem;
+                font-family: inherit;
+                outline: none;
+                transition: all 0.2s;
+            }
+
+            input:focus,
+            select:focus {
+                border-color: var(--accent);
+                box-shadow: 0 0 0 2px var(--accent-glow);
+            }
+
+            input[type="number"] {
+                font-family: var(--font-mono);
+            }
+
+            .btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                padding: 10px 16px;
+                border-radius: 8px;
+                font-size: 0.84rem;
+                font-weight: 700;
+                cursor: pointer;
+                border: none;
+                transition: all 0.2s;
+                outline: none;
+                -webkit-user-select: none;
+                user-select: none;
+            }
+
+            .btn-primary {
+                background: var(--accent);
+                color: #fff;
+            }
+
+            .btn-primary:hover:not(:disabled) {
+                background: var(--accent-hover);
+                box-shadow: 0 4px 12px var(--accent-glow);
+            }
+
+            .btn-emergency {
+                background: linear-gradient(135deg, #dc2626, #b91c1c);
+                color: #fff;
+                box-shadow: 0 4px 14px rgba(220, 38, 38, 0.3);
+            }
+
+            .btn-emergency:hover:not(:disabled) {
+                background: linear-gradient(135deg, #ef4444, #dc2626);
+                box-shadow: 0 4px 18px rgba(239, 68, 68, 0.45);
+            }
+
+            .btn:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+                filter: grayscale(0.5);
+            }
+
+            /* Route Finder Section */
+            .route-form-row {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+
+            .route-result-box {
+                margin-top: 4px;
+                padding: 12px;
+                background: #111522;
+                border-left: 3px solid var(--accent);
+                border-radius: 6px;
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                font-size: 0.8rem;
+            }
+
+            .route-result-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                font-weight: 700;
+                color: var(--accent);
+            }
+
+            .route-path-display {
+                font-family: var(--font-mono);
+                font-size: 0.82rem;
+                color: #f1f5f9;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                flex-wrap: wrap;
+            }
+
+            .route-arrow {
+                color: var(--text-dim);
+            }
+
+            /* Tab Controls */
+            .tab-header {
+                display: flex;
+                gap: 6px;
+                border-bottom: 1px solid var(--border);
+                padding-bottom: 8px;
+            }
+
+            .tab-btn {
+                background: transparent;
+                border: none;
+                color: var(--text-muted);
+                font-size: 0.76rem;
+                font-weight: 600;
+                padding: 4px 10px;
+                border-radius: 6px;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+
+            .tab-btn.active {
+                background: rgba(59, 130, 246, 0.15);
+                color: #60a5fa;
+            }
+
+            /* Tables */
+            .table-container {
+                overflow-x: auto;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                text-align: left;
+                font-size: 0.78rem;
+            }
+
+            th {
+                background: #121624;
+                color: var(--text-dim);
+                font-size: 0.68rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                padding: 8px 10px;
+                border-bottom: 1px solid var(--border);
+                font-weight: 700;
+            }
+
+            td {
+                padding: 8px 10px;
+                border-bottom: 1px solid #1c2233;
+                color: var(--text);
+            }
+
+            tr:last-child td {
+                border-bottom: none;
+            }
+
+            .road-cell {
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .status-badge {
+                display: inline-block;
+                padding: 2px 7px;
+                border-radius: 4px;
+                font-size: 0.68rem;
+                font-weight: 700;
+                letter-spacing: 0.03em;
+            }
+
+            .status-badge.green {
+                background: rgba(16, 185, 129, 0.15);
+                color: #34d399;
+                border: 1px solid rgba(16, 185, 129, 0.25);
+            }
+
+            .status-badge.waiting {
+                background: rgba(100, 116, 139, 0.15);
+                color: #94a3b8;
+                border: 1px solid rgba(100, 116, 139, 0.25);
+            }
+
+            .status-badge.cleared {
+                background: rgba(30, 41, 59, 0.4);
+                color: #64748b;
+            }
+
+            /* History List */
+            .history-list {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                max-height: 160px;
+                overflow-y: auto;
+                padding-right: 4px;
+            }
+
+            .history-item {
+                padding: 10px 12px;
+                background: #111522;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                font-size: 0.78rem;
+            }
+
+            .history-top {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .history-vehicle {
+                font-weight: 700;
+                color: #f1f5f9;
+                font-family: var(--font-mono);
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .severity-badge {
+                font-size: 0.65rem;
+                font-weight: 700;
+                padding: 1px 6px;
+                border-radius: 3px;
+            }
+
+            .severity-1 {
+                background: rgba(239, 68, 68, 0.2);
+                color: #f87171;
+                border: 1px solid rgba(239, 68, 68, 0.3);
+            }
+            .severity-2 {
+                background: rgba(245, 158, 11, 0.2);
+                color: #fbbf24;
+                border: 1px solid rgba(245, 158, 11, 0.3);
+            }
+            .severity-3 {
+                background: rgba(59, 130, 246, 0.2);
+                color: #60a5fa;
+                border: 1px solid rgba(59, 130, 246, 0.3);
+            }
+
+            .history-route {
+                font-family: var(--font-mono);
+                color: #94a3b8;
+                font-size: 0.74rem;
+            }
+
+            .empty-state {
+                text-align: center;
+                padding: 18px;
+                color: var(--text-dim);
+                font-size: 0.78rem;
+            }
+
+            /* Toast Notification System */
+            .toast-container {
+                position: fixed;
+                top: 18px;
+                right: 20px;
+                z-index: 9999;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                pointer-events: none;
+            }
+
+            .toast {
+                pointer-events: auto;
+                min-width: 280px;
+                max-width: 380px;
+                padding: 12px 16px;
+                border-radius: 10px;
+                font-size: 0.82rem;
+                font-weight: 500;
+                color: #fff;
+                display: flex;
+                align-items: flex-start;
+                gap: 10px;
+                box-shadow:
+                    0 10px 25px -5px rgba(0, 0, 0, 0.5),
+                    0 8px 10px -6px rgba(0, 0, 0, 0.3);
+                transform: translateX(120%);
+                transition:
+                    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+                    opacity 0.3s;
+                opacity: 0;
+            }
+
+            .toast.show {
+                transform: translateX(0);
+                opacity: 1;
+            }
+
+            .toast-success {
+                background: #064e3b;
+                border: 1px solid #059669;
+            }
+
+            .toast-error {
+                background: #7f1d1d;
+                border: 1px solid #dc2626;
+            }
+
+            .toast-info {
+                background: #1e3a8a;
+                border: 1px solid #2563eb;
+            }
+
+            .toast-icon {
+                font-size: 1rem;
+                margin-top: 1px;
+            }
+
+            .toast-content {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+            }
+
+            .toast-title {
+                font-weight: 700;
+                font-size: 0.85rem;
+            }
+
+            .toast-close {
+                cursor: pointer;
+                opacity: 0.7;
+                border: none;
+                background: transparent;
+                color: #fff;
+                font-size: 1rem;
+                line-height: 1;
+            }
+
+            .toast-close:hover {
+                opacity: 1;
+            }
+
+            /* Hidden element for legacy backward compatibility */
+            #message {
+                display: none;
+            }
+
+            /* Responsive Design */
+            @media (max-width: 1024px) {
+                body {
+                    height: auto;
+                    overflow: auto;
+                }
+                .app-container {
+                    grid-template-columns: 1fr;
+                    height: auto;
+                }
+                .simulation-panel {
+                    height: 520px;
+                }
+                .controls-panel {
+                    height: auto;
+                    overflow-y: visible;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="app-container">
+            <!-- Left Side: Canvas Simulation Panel (60% width) -->
+            <section class="simulation-panel">
+                <div class="sim-topbar">
+                    <div class="sim-title-group">
+                        <div class="pulse-indicator" id="simPulse"></div>
+                        <h2>Traffic Grid</h2>
+                    </div>
+                    <div class="sim-legend">
+                        <span class="legend-item"
+                            ><span class="legend-dot normal"></span>
+                            Normal</span
+                        >
+                        <span class="legend-item"
+                            ><span class="legend-dot emergency"></span>
+                            Emergency</span
+                        >
+                        <span class="legend-item"
+                            ><span class="legend-dot yield"></span>
+                            Yielding</span
+                        >
+                        <span class="legend-item"
+                            ><span class="legend-dot green"></span> Green
+                            Signal</span
+                        >
+                    </div>
+                </div>
+
+                <div class="canvas-viewport" id="canvasContainer">
+                    <canvas
+                        id="cityCanvas"
+                        aria-label="City Traffic Grid Canvas"
+                    ></canvas>
+                </div>
+
+                <div class="sim-bottom-bar">
+                    <span id="canvasFps"
+                        >Engine: 60 FPS · Two-way Multi-lane Grid</span
+                    >
+                    <span id="canvasStatusText"
+                        >Autonomous Signal Cycle Active</span
+                    >
+                </div>
+            </section>
+
+            <!-- Right Side: Controls Panel (40% width) -->
+            <aside class="controls-panel">
+                <!-- Brand Header -->
+                <header class="brand-header">
+                    <div class="brand-title">
+                        <h1>
+                            <span class="badge-pill">Smart Traffic v2.4</span>
+                        </h1>
+                        <div class="brand-subtitle">
+                            Dijkstra Preemption & Real-Time Flow Optimization
+                        </div>
+                    </div>
+                    <div class="connection-status" id="streamStatus">
+                        <span class="status-dot"></span>
+                        <span id="streamStatusText">SSE Stream Live</span>
+                    </div>
+                </header>
+
+                <!-- Legacy compatibility placeholder -->
+                <div id="message"></div>
+
+                <!-- Live Stats Row -->
+                <section class="stats-row">
+                    <div class="stat-card">
+                        <div class="stat-label">Waiting Vehicles</div>
+                        <div class="stat-value" id="statWaitingVehicles">
+                            0 <span class="stat-sub">cars</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Active Junctions</div>
+                        <div class="stat-value">
+                            4 / 4 <span class="stat-sub">online</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Emergency Status</div>
+                        <div class="stat-value">
+                            <span
+                                class="stat-badge normal"
+                                id="emergencyStatusBadge"
+                                >NORMAL FLOW</span
+                            >
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Card: Update Road Traffic -->
+                <section class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span class="card-icon">🚗</span>
+                            <span>Set Traffic Volume</span>
+                        </div>
+                    </div>
+                    <div class="road-inputs" id="roadInputs">
+                        <!-- Rendered via JS -->
+                    </div>
+                    <button
+                        class="btn btn-primary"
+                        id="trafficButton"
+                        type="button"
+                    >
+                        Update Green Light Plan
+                    </button>
+                </section>
+
+                <!-- Card: Emergency Dispatch -->
+                <section class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span class="card-icon">🚨</span>
+                            <span>Emergency Priority Dispatch</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="vehicleId">Emergency Vehicle ID</label>
+                        <input
+                            id="vehicleId"
+                            placeholder="e.g. AMB-01, FIRE-09"
+                            value="AMB-01"
+                            required
+                        />
+                    </div>
+                    <div class="route-form-row">
+                        <div class="form-group">
+                            <label for="severity"
+                                >Severity Level (1 = highest)</label
+                            >
+                            <select id="severity">
+                                <option value="1">
+                                    Level 1 - Critical (Code Red)
+                                </option>
+                                <option value="2">
+                                    Level 2 - High Urgency
+                                </option>
+                                <option value="3">
+                                    Level 3 - Standard Priority
+                                </option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="emergencyCount"
+                                >Vehicles in Convoy</label
+                            >
+                            <input
+                                id="emergencyCount"
+                                type="number"
+                                min="1"
+                                max="10"
+                                value="1"
+                            />
+                        </div>
+                    </div>
+                    <div class="route-form-row">
+                        <div class="form-group">
+                            <label for="road">Origin Road</label>
+                            <select id="road"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="destination"
+                                >Destination Junction</label
+                            >
+                            <select id="destination">
+                                <option value="NorthJunction">
+                                    North Junction
+                                </option>
+                                <option value="EastJunction">
+                                    East Junction
+                                </option>
+                                <option value="SouthJunction">
+                                    South Junction
+                                </option>
+                                <option value="WestJunction">
+                                    West Junction
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+                    <button
+                        class="btn btn-emergency"
+                        id="dispatchButton"
+                        type="button"
+                    >
+                        Dispatch & Preempt Corridor
+                    </button>
+                </section>
+
+                <!-- Card: Traffic Plan & Signal Table -->
+                <section class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span class="card-icon">⏱️</span>
+                            <span>Traffic Plan & Signal Timings</span>
+                        </div>
+                        <div class="tab-header">
+                            <button
+                                class="tab-btn active"
+                                id="tabLivePlan"
+                                type="button"
+                            >
+                                Live Plan
+                            </button>
+                            <button
+                                class="tab-btn"
+                                id="tabInitialPlan"
+                                type="button"
+                            >
+                                Initial Plan
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Live Traffic Table -->
+                    <div class="table-container" id="liveTableWrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Road</th>
+                                    <th>Waiting</th>
+                                    <th>Green Time</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="trafficTable">
+                                <!-- Populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+    
+                    <!-- Initial Plan Table -->
+                    <div
+                        class="table-container"
+                        id="initialTableWrap"
+                        class="table-container is-hidden"
+                    >
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Road</th>
+                                    <th>Submitted Vehicles</th>
+                                    <th>Planned Green Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="initialTrafficTable">
+                                <!-- Populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Card: Emergency Dispatch History -->
+                <section class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span class="card-icon">📋</span>
+                            <span>Emergency Dispatch History</span>
+                        </div>
+                    </div>
+                    <div class="history-list" id="dispatches">
+                        <div class="empty-state">
+                            No emergency vehicles dispatched yet.
+                        </div>
+                    </div>
+                </section>
+            </aside>
+        </div>
+
+        <!-- Toast Container -->
+        <div class="toast-container" id="toastContainer"></div>
+
+        <script>
+            /**
+             * High-Performance Single-File Architecture
+             */
+            const api = "/api";
+            const $ = (id) => document.getElementById(id);
+
+            // --- Toast Notification System ---
+            let activeToast = null;
+            let activeToastKey = null;
+            let activeToastTimer = null;
+            let lastToastAt = 0;
+
+            function showToast(title, message, type = "info") {
+                const container = $("toastContainer");
+                const toastKey = `${type}:${title}:${message}`;
+                const now = Date.now();
+                if (
+                    toastKey === activeToastKey &&
+                    now - lastToastAt < 5000
+                )
+                    return;
+
+                if (activeToast) {
+                    activeToast.classList.remove("show");
+                    if (activeToast.parentNode) {
+                        activeToast.parentNode.removeChild(activeToast);
+                    }
+                }
+                clearTimeout(activeToastTimer);
+
+                const toast = document.createElement("div");
+                toast.className = `toast toast-${type}`;
+
+                const icon =
+                    type === "success" ? "✓" : type === "error" ? "✕" : "ℹ";
+                toast.innerHTML = `
+    <span class="toast-icon">${icon}</span>
+    <div class="toast-content">
+      <div class="toast-title">${title}</div>
+      <div>${message}</div>
+    </div>
+    <button class="toast-close" type="button">&times;</button>
+  `;
+
+                const closeBtn = toast.querySelector(".toast-close");
+  closeBtn.onclick = () => removeToast();
+
+  activeToast = toast;
+  activeToastKey = toastKey;
+  lastToastAt = now;
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("show"));
+  activeToastTimer = setTimeout(removeToast, 3200);
+            }
+
+            function removeToast() {
+  if (!activeToast) return;
+  clearTimeout(activeToastTimer);
+  activeToast.classList.remove("show");
+  if (activeToast.parentNode) {
+      activeToast.parentNode.removeChild(activeToast);
+  }
+  activeToast = null;
+            }
+
+            // Legacy message banner compatibility helper
+            function showMessage(text, error = false) {
+                showToast(
+                    error ? "Alert" : "Notice",
+                    text,
+                    error ? "error" : "success",
+                );
+            }
+
+            // --- Fetch Utility ---
+            async function request(url, options = {}) {
+                const response = await fetch(api + url, {
+                    headers: { "Content-Type": "application/json" },
+                    ...options,
+                });
+                const text = await response.text();
+                let data;
+                try {
+                    data = text ? JSON.parse(text) : {};
+                } catch {
+                    data = { error: text };
+                }
+                if (!response.ok) {
+                    throw new Error(data.error || "Server request failed");
+                }
+                return data;
+            }
+
+            // --- City Geography & Junction Mappings ---
+            const JUNCTION_CONFIG = {
+                NorthJunction: {
+                    x: 0.34,
+                    y: 0.34,
+                    label: "NORTH JUNCTION",
+                    road: "Lotus Avenue",
+                },
+                EastJunction: {
+                    x: 0.66,
+                    y: 0.34,
+                    label: "EAST JUNCTION",
+                    road: "Riverfront Road",
+                },
+                SouthJunction: {
+                    x: 0.66,
+                    y: 0.66,
+                    label: "SOUTH JUNCTION",
+                    road: "Sunrise Boulevard",
+                },
+                WestJunction: {
+                    x: 0.34,
+                    y: 0.66,
+                    label: "WEST JUNCTION",
+                    road: "Market Street",
+                },
+            };
+
+            const ROAD_CONFIG = {
+                "Lotus Avenue": {
+                    junction: "NorthJunction",
+                    axis: "vertical",
+                    edge: [0.34, 0],
+                    inboundDir: "s", // Moves South (Down): y increases
+                    outboundDir: "n", // Moves North (Up): y decreases
+                    leftOffset: -7,
+                    rightOffset: 7,
+                },
+                "Sunrise Boulevard": {
+                    junction: "SouthJunction",
+                    axis: "vertical",
+                    edge: [0.66, 1],
+                    inboundDir: "n", // Moves North (Up): y decreases
+                    outboundDir: "s", // Moves South (Down): y increases
+                    leftOffset: -7,
+                    rightOffset: 7,
+                },
+                "Riverfront Road": {
+                    junction: "EastJunction",
+                    axis: "horizontal",
+                    edge: [1, 0.34],
+                    inboundDir: "w", // Moves West (Left): x decreases
+                    outboundDir: "e", // Moves East (Right): x increases
+                    leftOffset: -7,
+                    rightOffset: 7,
+                },
+                "Market Street": {
+                    junction: "WestJunction",
+                    axis: "horizontal",
+                    edge: [0, 0.66],
+                    inboundDir: "e", // Moves East (Right): x increases
+                    outboundDir: "w", // Moves West (Left): x decreases
+                    leftOffset: -7,
+                    rightOffset: 7,
+                },
+            };
+
+            // Global Simulation State
+            let dashboardState = null;
+            let activeEmergencyVehicles = [];
+            let highlightedRouteSegments = [];
+            let highlightedRouteTimer = null;
+            let activeEmergencyPathSegments = new Set();
+            let activeEmergencyRoadDirections = new Set();
+            const haltedFlowProgress = new Map();
+            // Destination-based halt: the final junction the emergency vehicle is heading to.
+            // All normal roads whose endpoint IS this junction also yield (arrival zone cleared).
+            let activeEmergencyDestination = null;
+            let isResumingTraffic = false;
+            let trafficDraft = {};
+            let lastFrameTime = performance.now();
+
+            // Canvas Initialization
+            const canvas = $("cityCanvas");
+            const ctx = canvas.getContext("2d");
+
+            function resizeCanvas() {
+                const container = $("canvasContainer");
+                const dpr = window.devicePixelRatio || 1;
+                const w = container.clientWidth;
+                const h = container.clientHeight;
+                canvas.width = w * dpr;
+                canvas.height = h * dpr;
+                canvas.style.width = `${w}px`;
+                canvas.style.height = `${h}px`;
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            }
+            window.addEventListener("resize", resizeCanvas);
+            resizeCanvas();
+
+            // --- Lane & Vehicle Simulation Parameters ---
+            const CAR_LENGTH = 14;
+            const CAR_WIDTH = 8;
+            const EMERGENCY_LENGTH = 18;
+            const EMERGENCY_WIDTH = 10;
+            const SAFE_GAP = 26;
+            const MIN_SPAWN_DIST = 38;
+            const LANE_OFFSET = 7;
+
+            function getLaneOffset(direction, side, distance = LANE_OFFSET) {
+                const vectors = {
+                    n: { x: 0, y: -1 },
+                    s: { x: 0, y: 1 },
+                    e: { x: 1, y: 0 },
+                    w: { x: -1, y: 0 },
+                };
+                const vector = vectors[direction] || vectors.e;
+                const sign = side === "left" ? 1 : -1;
+
+                return {
+                    // Screen coordinates grow downward, so this is the
+                    // geometric left-hand normal for the travel direction.
+                    x: vector.y * distance * sign,
+                    y: -vector.x * distance * sign,
+                };
+            }
+
+            /**
+             * RoadLane: Continuous realistic traffic flow on both lanes
+             * Left lane = Inbound (edge -> junction)
+             * Right lane = Outbound (junction -> edge)
+             */
+            class RoadLane {
+                constructor(roadName, laneType) {
+                    this.roadName = roadName;
+                    this.laneType = laneType; // 'inbound' or 'outbound'
+                    this.cars = [];
+                    this.spawnTimer = 0;
+                }
+
+                update(dt, roadCount, roadWidth, roadHeight) {
+                    const config = ROAD_CONFIG[this.roadName];
+                    const jPos = JUNCTION_CONFIG[config.junction];
+                    const ePos = config.edge;
+
+                    // Calculate start & end coordinates
+                    let startX, startY, endX, endY, dir, angle;
+                    if (this.laneType === "inbound") {
+                        startX = ePos[0] * roadWidth;
+                        startY = ePos[1] * roadHeight;
+                        endX = jPos.x * roadWidth;
+                        endY = jPos.y * roadHeight;
+                        dir = config.inboundDir;
+                    } else {
+                        startX = jPos.x * roadWidth;
+                        startY = jPos.y * roadHeight;
+                        endX = ePos[0] * roadWidth;
+                        endY = ePos[1] * roadHeight;
+                        dir = config.outboundDir;
+                    }
+
+                    // Lane lateral offset: Left lane = -7px, Right lane = +7px
+                    // This is a left-hand traffic layout: each vehicle stays
+                    // on the left side relative to its own heading. Using
+                    // inbound/outbound here can put opposite headings on the
+                    // same physical lane on horizontal roads.
+                    const laneSide = "left";
+                    const laneOffset = getLaneOffset(dir, laneSide);
+                    const roadLength = Math.hypot(endX - startX, endY - startY);
+
+                    // Direction math:
+                    // North: y decreases (-PI/2)
+                    // South: y increases (PI/2)
+                    // East:  x increases (0)
+                    // West:  x decreases (PI)
+                    if (dir === "n") angle = -Math.PI / 2;
+                    else if (dir === "s") angle = Math.PI / 2;
+                    else if (dir === "e") angle = 0;
+                    else if (dir === "w") angle = Math.PI;
+
+                    // Check if this road segment has active emergency preemption
+                    const isEmergencyOnThisRoad =
+                        activeEmergencyRoadDirections.has(
+                            `${this.roadName}-${dir}`,
+                        );
+
+                    // Target cars on this lane based on submitted vehicleCount
+                    const targetCars =
+                        roadCount > 0
+                            ? Math.min(Math.max(1, Math.ceil(roadCount / 3)), 7)
+                            : 0;
+
+                    // Continuous spawning with anti-stacking safe distance guarantee
+                    this.spawnTimer += dt;
+                    if (
+                        this.cars.length < targetCars &&
+                        this.spawnTimer > 1.2
+                    ) {
+                        let canSpawn = true;
+                        if (this.cars.length > 0) {
+                            const lastCar = this.cars[this.cars.length - 1];
+                            if (lastCar.dist < MIN_SPAWN_DIST) {
+                                canSpawn = false;
+                            }
+                        }
+                        if (canSpawn) {
+                            this.spawnTimer = 0;
+                            this.cars.push({
+                                id: Math.random().toString(36).substr(2, 9),
+                                dist: 0,
+                                speed: 48 + Math.random() * 12,
+                                currentSpeed: 48,
+                                lateralOffset: { ...laneOffset },
+                                targetOffset: { ...laneOffset },
+                                yielding: false,
+                                laneCleared: false,
+                                color: getRandomCarColor(),
+                            });
+                        }
+                    }
+
+                    // Move vehicles along lane with safe gap & collision avoidance
+                    for (let i = 0; i < this.cars.length; i++) {
+                        const car = this.cars[i];
+
+                        // Safe gap check with vehicle ahead in the same lane
+                        let maxAllowedDist = roadLength;
+                        if (i > 0) {
+                            const ahead = this.cars[i - 1];
+                            maxAllowedDist = ahead.dist - SAFE_GAP;
+                        }
+
+                        // Emergency conflict fix: only vehicles on the active emergency segments yield
+                        if (isEmergencyOnThisRoad) {
+                            // Move decisively toward the curb so the
+                            // ambulance lane clears without stopping traffic.
+                            const yieldShift = getLaneOffset(dir, "right", 10);
+                            car.targetOffset = {
+                                x: laneOffset.x + yieldShift.x,
+                                y: laneOffset.y + yieldShift.y,
+                            };
+                            const lateralDistance = Math.hypot(
+                                car.lateralOffset.x - laneOffset.x,
+                                car.lateralOffset.y - laneOffset.y,
+                            );
+                            car.laneCleared = lateralDistance >= 6;
+                            car.yielding = !car.laneCleared;
+                            // Move slowly while steering aside. Stopping every
+                            // vehicle here creates a deadlock with the ambulance.
+                            car.currentSpeed = Math.min(
+                                car.speed * 0.75,
+                                car.currentSpeed + 45 * dt,
+                            );
+                        } else {
+                            car.yielding = false;
+                            car.laneCleared = false;
+                            car.targetOffset = { ...laneOffset };
+                            car.currentSpeed = Math.min(
+                                car.speed,
+                                car.currentSpeed + 45 * dt,
+                            );
+                        }
+
+                        // Lateral offset transition (smooth steering animation)
+                        car.lateralOffset.x +=
+                            (car.targetOffset.x - car.lateralOffset.x) *
+                            Math.min(1, 8 * dt);
+                        car.lateralOffset.y +=
+                            (car.targetOffset.y - car.lateralOffset.y) *
+                            Math.min(1, 8 * dt);
+
+                        // Distance advancement with clamp
+                        const desiredDist = car.dist + car.currentSpeed * dt;
+                        car.dist = Math.min(desiredDist, maxAllowedDist);
+
+                        // Calculate world position
+                        const progress =
+                            roadLength > 0 ? car.dist / roadLength : 0;
+                        let cx = startX + (endX - startX) * progress;
+                        let cy = startY + (endY - startY) * progress;
+
+                        // Apply lateral perpendicular offset
+                        cx += car.lateralOffset.x;
+                        cy += car.lateralOffset.y;
+
+                        car.x = cx;
+                        car.y = cy;
+                        car.angle = angle;
+                    }
+
+                    // Recycle vehicles that completed their journey
+                    this.cars = this.cars.filter(
+                        (car) => car.dist < roadLength - 2,
+                    );
+                }
+            }
+
+            // Aesthetic palette for modern city traffic
+            const CAR_PALETTE = [
+                "#475569",
+                "#3b82f6",
+                "#64748b",
+                "#4a6b82",
+                "#38bdf8",
+                "#526b7d",
+            ];
+            function getRandomCarColor() {
+                return CAR_PALETTE[
+                    Math.floor(Math.random() * CAR_PALETTE.length)
+                ];
+            }
+
+            // Instantiate road lanes for all 4 two-way roads
+            const roadLanes = [];
+            Object.keys(ROAD_CONFIG).forEach((roadName) => {
+                roadLanes.push(new RoadLane(roadName, "inbound"));
+                roadLanes.push(new RoadLane(roadName, "outbound"));
+            });
+
+            // --- Emergency Vehicle Lifecycle ---
+            function spawnEmergencyConvoy(roadName, dispatch, count) {
+                if (
+                    !dispatch.routeFound ||
+                    !dispatch.path ||
+                    dispatch.path.length === 0
+                )
+                    return false;
+
+                const config = ROAD_CONFIG[roadName];
+                if (!config) return false;
+
+                const width = canvas.clientWidth;
+                const height = canvas.clientHeight;
+
+                // Build route waypoints: start outside edge -> start junction -> path junctions
+                const waypoints = [
+                    {
+                        x: config.edge[0] * width,
+                        y: config.edge[1] * height,
+                        name: roadName,
+                    },
+                ];
+
+                dispatch.path.forEach((jName) => {
+                    const j = JUNCTION_CONFIG[jName];
+                    if (j)
+                        waypoints.push({
+                            x: j.x * width,
+                            y: j.y * height,
+                            name: jName,
+                        });
+                });
+
+                if (waypoints.length < 2) return false;
+
+                // Mark active emergency segments: starting road + every hop between path junctions
+                activeEmergencyPathSegments.clear();
+                activeEmergencyRoadDirections.clear();
+                const firstJunction = dispatch.path[0];
+                const firstPoint = JUNCTION_CONFIG[firstJunction];
+                const startPoint = waypoints[0];
+                if (firstPoint && startPoint) {
+                    activeEmergencyRoadDirections.add(
+                        `${roadName}-${getDirectionFromDelta(
+                            firstPoint.x - startPoint.x,
+                            firstPoint.y - startPoint.y,
+                        )}`,
+                    );
+                }
+                for (let i = 0; i < dispatch.path.length - 1; i++) {
+                    const a = dispatch.path[i];
+                    const b = dispatch.path[i + 1];
+                    activeEmergencyPathSegments.add(`${a}-${b}`);
+                }
+
+                // Update UI badge
+                const badge = $("emergencyStatusBadge");
+                badge.textContent = `PRIORITY ACTIVE (${dispatch.vehicleId})`;
+                badge.className = "stat-badge emergency-active";
+
+                // Spawn emergency vehicles with staggered spacing
+                for (let i = 0; i < count; i++) {
+                    activeEmergencyVehicles.push({
+                        id:
+                            count === 1
+                                ? dispatch.vehicleId
+                                : `${dispatch.vehicleId}-${i + 1}`,
+                        severity: dispatch.severity,
+                        destination: dispatch.destination,
+                        waypoints: waypoints,
+                        currentSegment: 0,
+                        progress: -i * 0.18, // Staggered spacing behind lead vehicle
+                        speed: 130, // Fast emergency speed
+                        x: waypoints[0].x,
+                        y: waypoints[0].y,
+                        angle: 0,
+                        blocked: false,
+                        parked: false,
+                    });
+                }
+
+                return true;
+            }
+
+            function updateEmergencyVehicles(dt) {
+                if (activeEmergencyVehicles.length === 0) return;
+
+                activeEmergencyVehicles.forEach((ev) => {
+                    if (ev.parked) return;
+
+                    if (ev.progress < 0) {
+                        ev.progress += (ev.speed / 200) * dt;
+                        return;
+                    }
+
+                    const p1 = ev.waypoints[ev.currentSegment];
+                    const p2 = ev.waypoints[ev.currentSegment + 1];
+
+                    if (!p2) {
+                        ev.parked = true;
+                        return;
+                    }
+
+                    const wasBlocked = ev.blocked;
+                    ev.blocked = isEmergencyBlocked(ev);
+                    if (ev.blocked) {
+                        ev.angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                        if (!wasBlocked) {
+                            const badge = $("emergencyStatusBadge");
+                            badge.textContent = "AMBULANCE BLOCKED";
+                            badge.className = "stat-badge emergency-blocked";
+                            showToast(
+                                "Ambulance Blocked",
+                                "Traffic is occupying the emergency vehicle lane.",
+                                "error",
+                            );
+                        }
+                        return;
+                    }
+
+                    if (wasBlocked) {
+                        const badge = $("emergencyStatusBadge");
+                        badge.textContent = `PRIORITY ACTIVE (${ev.id})`;
+                        badge.className = "stat-badge emergency-active";
+                    }
+
+                    const segLen = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                    const speedProgress = (ev.speed * dt) / Math.max(1, segLen);
+                    ev.progress += speedProgress;
+
+                    ev.angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+
+                    if (ev.progress >= 1) {
+                        ev.currentSegment++;
+                        ev.progress = 0;
+                        if (ev.currentSegment >= ev.waypoints.length - 1) {
+                            ev.x = ev.waypoints[ev.waypoints.length - 1].x;
+                            ev.y = ev.waypoints[ev.waypoints.length - 1].y;
+                            ev.parked = true;
+                            return;
+                        }
+                    }
+
+                    function isEmergencyBlocked(ev) {
+                        const p1 = ev.waypoints[ev.currentSegment];
+                        const p2 = ev.waypoints[ev.currentSegment + 1];
+                        if (!p1 || !p2) return false;
+
+                        const dx = p2.x - p1.x;
+                        const dy = p2.y - p1.y;
+                        const length = Math.max(1, Math.hypot(dx, dy));
+                        const directionX = dx / length;
+                        const directionY = dy / length;
+                        const obstacleIsAhead = (x, y) => {
+                            const relativeX = x - ev.x;
+                            const relativeY = y - ev.y;
+                            const distance = Math.hypot(relativeX, relativeY);
+                            const forwardDistance =
+                                relativeX * directionX +
+                                relativeY * directionY;
+                            return (
+                                distance < 28 &&
+                                forwardDistance > -8 &&
+                                forwardDistance < 38
+                            );
+                        };
+
+                        // RoadLane cars are the vehicles that can physically
+                        // occupy the ambulance's approach from an outer road.
+                        if (
+                            ROAD_CONFIG[p1.name] &&
+                            roadLanes.some((lane) =>
+                                lane.cars.some(
+                                    (car) =>
+                                        !car.emergency &&
+                                        !car.yielding &&
+                                        !car.laneCleared &&
+                                        obstacleIsAhead(car.x, car.y),
+                                ),
+                            )
+                        ) {
+                            return true;
+                        }
+
+                        const now = Date.now();
+                        const width = canvas.clientWidth;
+                        const height = canvas.clientHeight;
+                        if (!dashboardState || !Array.isArray(dashboardState.flowVehicles)) {
+                            return false;
+                        }
+
+                        return dashboardState.flowVehicles.some((flow) => {
+                            if (
+                                flow.emergency ||
+                                flow.source !== p1.name ||
+                                flow.destination !== p2.name
+                            )
+                                return false;
+
+                            const flowRouteMarked =
+                                dashboardState.emergencySegments?.includes(
+                                    `${flow.source}-${flow.destination}`,
+                                ) ||
+                                activeEmergencyPathSegments.has(
+                                    `${flow.source}-${flow.destination}`,
+                                );
+                            if (flowRouteMarked) return false;
+
+                            const start = JUNCTION_CONFIG[flow.source];
+                            const end = JUNCTION_CONFIG[flow.destination];
+                            if (!start || !end) return false;
+
+                            const duration = Math.max(
+                                flow.arrivalAt - flow.startedAt,
+                                1000,
+                            );
+                            const progress = Math.min(
+                                1,
+                                Math.max(0, (now - flow.startedAt) / duration),
+                            );
+                            const flowX =
+                                start.x * width +
+                                (end.x - start.x) * width * progress;
+                            const flowY =
+                                start.y * height +
+                                (end.y - start.y) * height * progress;
+                            return obstacleIsAhead(flowX, flowY);
+                        });
+                    }
+
+                    const curP1 = ev.waypoints[ev.currentSegment];
+                    const curP2 = ev.waypoints[ev.currentSegment + 1];
+                    ev.x = curP1.x + (curP2.x - curP1.x) * ev.progress;
+                    ev.y = curP1.y + (curP2.y - curP1.y) * ev.progress;
+                });
+
+                // Check if all emergency vehicles arrived
+                const allArrived = activeEmergencyVehicles.every(
+                    (ev) => ev.parked,
+                );
+                if (allArrived && !isResumingTraffic) {
+                    handleEmergencyArrival();
+                }
+            }
+
+            async function handleEmergencyArrival() {
+                isResumingTraffic = true;
+                try {
+                    const updated = await request("/traffic/resume", {
+                        method: "POST",
+                    });
+                    activeEmergencyVehicles = [];
+                    activeEmergencyPathSegments.clear();
+                    activeEmergencyRoadDirections.clear();
+                    haltedFlowProgress.clear();
+
+                    const badge = $("emergencyStatusBadge");
+                    badge.textContent = "NORMAL FLOW";
+                    badge.className = "stat-badge normal";
+
+                    render(updated);
+                    showToast(
+                        "Emergency Arrived",
+                        "Emergency vehicle reached destination. Normal traffic resumed.",
+                        "success",
+                    );
+                } catch (err) {
+                    console.error("Failed to resume traffic:", err);
+                } finally {
+                    isResumingTraffic = false;
+                }
+            }
+
+            // --- Canvas Graphics Rendering Pipeline ---
+            function renderSimulation(timestamp) {
+                const dt = Math.min((timestamp - lastFrameTime) / 1000, 0.1);
+                lastFrameTime = timestamp;
+
+                const w = canvas.clientWidth;
+                const h = canvas.clientHeight;
+
+                // Clear canvas
+                ctx.clearRect(0, 0, w, h);
+
+                // 1. Draw City Background & Building Blocks
+                drawCityBackground(w, h);
+
+                // 2. Draw 4 Two-Lane Roads with Centerlines & Direction Arrows
+                drawRoadNetwork(w, h);
+
+                // 3. Draw Route Highlight (if Dijkstra route active)
+                drawRouteHighlight(w, h);
+
+                // 4. Update & Draw Normal Traffic Lanes
+                updateAndDrawTraffic(dt, w, h);
+
+                // 5. Draw Backend Flow Vehicles between Junctions
+                drawFlowVehicles(w, h);
+
+                // 6. Update & Draw Emergency Vehicles
+                updateEmergencyVehicles(dt);
+                drawEmergencyVehicles();
+
+                // 7. Draw Traffic Signals at Junctions
+                drawTrafficSignals(w, h);
+
+                // 8. Draw Junction Information Boxes
+                drawJunctionBoxes(w, h);
+
+                // requestAnimationFrame loop runs at all times
+                requestAnimationFrame(renderSimulation);
+            }
+
+            // 1. City Blocks & Ground Detail
+            function drawCityBackground(w, h) {
+                ctx.fillStyle = "#0c0f17";
+                ctx.fillRect(0, 0, w, h);
+
+                // Subtle architectural grid texture
+                ctx.strokeStyle = "rgba(38, 45, 64, 0.45)";
+                ctx.lineWidth = 1;
+                const gridSize = 36;
+                ctx.beginPath();
+                for (let x = 0; x < w; x += gridSize) {
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, h);
+                }
+                for (let y = 0; y < h; y += gridSize) {
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(w, y);
+                }
+                ctx.stroke();
+
+                // City blocks in the 4 corners + center plaza
+                const roadHalf = 18;
+                const blocks = [
+                    {
+                        x: 14,
+                        y: 14,
+                        w: w * 0.34 - roadHalf - 18,
+                        h: h * 0.34 - roadHalf - 18,
+                        label: "FINANCIAL DISTRICT",
+                    },
+                    {
+                        x: w * 0.66 + roadHalf + 8,
+                        y: 14,
+                        w: w * 0.34 - roadHalf - 22,
+                        h: h * 0.34 - roadHalf - 18,
+                        label: "TECH PARK",
+                    },
+                    {
+                        x: 14,
+                        y: h * 0.66 + roadHalf + 8,
+                        w: w * 0.34 - roadHalf - 18,
+                        h: h * 0.34 - roadHalf - 22,
+                        label: "COMMERCIAL HUB",
+                    },
+                    {
+                        x: w * 0.66 + roadHalf + 8,
+                        y: h * 0.66 + roadHalf + 8,
+                        w: w * 0.34 - roadHalf - 22,
+                        h: h * 0.34 - roadHalf - 22,
+                        label: "MEDICAL CENTER",
+                    },
+                    {
+                        x: w * 0.34 + roadHalf + 8,
+                        y: h * 0.34 + roadHalf + 8,
+                        w: w * 0.32 - roadHalf * 2 - 16,
+                        h: h * 0.32 - roadHalf * 2 - 16,
+                        isPlaza: true,
+                    },
+                ];
+
+                blocks.forEach((b) => {
+                    if (b.w <= 0 || b.h <= 0) return;
+
+                    if (b.isPlaza) {
+                        // Central Commons / Park
+                        ctx.fillStyle = "#0f291e";
+                        ctx.strokeStyle = "#1d4d38";
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        ctx.roundRect(b.x, b.y, b.w, b.h, 8);
+                        ctx.fill();
+                        ctx.stroke();
+
+                        ctx.strokeStyle = "rgba(74, 94, 84, 0.4)";
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(
+                            b.x + b.w / 2,
+                            b.y + b.h / 2,
+                            Math.min(b.w, b.h) * 0.28,
+                            0,
+                            Math.PI * 2,
+                        );
+                        ctx.stroke();
+
+                        ctx.fillStyle = "#6ee7b7";
+                        ctx.font = "600 9px var(--font-main)";
+                        ctx.textAlign = "center";
+                        ctx.fillText(
+                            "CENTRAL COMMONS",
+                            b.x + b.w / 2,
+                            b.y + b.h / 2 + 3,
+                        );
+                        return;
+                    }
+
+                    // Commercial / Residential City Blocks
+                    ctx.fillStyle = "#141a29";
+                    ctx.strokeStyle = "#263147";
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.roundRect(b.x, b.y, b.w, b.h, 6);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Rooftop accents
+                    ctx.fillStyle = "#1c2438";
+                    ctx.fillRect(
+                        b.x + 8,
+                        b.y + 8,
+                        Math.max(0, b.w - 16),
+                        Math.max(0, b.h - 16),
+                    );
+
+                    // District label
+                    ctx.fillStyle = "#4a5773";
+                    ctx.font = "700 8.5px var(--font-main)";
+                    ctx.textAlign = "center";
+                    ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 + 3);
+                });
+            }
+
+            // 2. Road Network Rendering
+            function drawRoadNetwork(w, h) {
+                const roadWidth = 36; // 18px per lane
+                const vertX = [w * 0.34, w * 0.66];
+                const horizY = [h * 0.34, h * 0.66];
+
+                // Draw asphalt bodies
+                ctx.fillStyle = "#1a202c";
+                vertX.forEach((x) => {
+                    ctx.fillRect(x - roadWidth / 2, 0, roadWidth, h);
+                });
+                horizY.forEach((y) => {
+                    ctx.fillRect(0, y - roadWidth / 2, w, roadWidth);
+                });
+
+                // Road curbs
+                ctx.strokeStyle = "#334155";
+                ctx.lineWidth = 1.5;
+                vertX.forEach((x) => {
+                    ctx.beginPath();
+                    ctx.moveTo(x - roadWidth / 2, 0);
+                    ctx.lineTo(x - roadWidth / 2, h);
+                    ctx.moveTo(x + roadWidth / 2, 0);
+                    ctx.lineTo(x + roadWidth / 2, h);
+                    ctx.stroke();
+                });
+                horizY.forEach((y) => {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y - roadWidth / 2);
+                    ctx.lineTo(w, y - roadWidth / 2);
+                    ctx.moveTo(0, y + roadWidth / 2);
+                    ctx.lineTo(w, y + roadWidth / 2);
+                    ctx.stroke();
+                });
+
+                // Centerlines: Dashed Yellow
+                ctx.strokeStyle = "#eab308";
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 8]);
+                vertX.forEach((x) => {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, h);
+                    ctx.stroke();
+                });
+                horizY.forEach((y) => {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(w, y);
+                    ctx.stroke();
+                });
+                ctx.setLineDash([]);
+
+                // Lane Directional Chevrons
+                drawLaneArrows(w, h);
+
+                // Road Name Labels on Canvas
+                drawRoadLabels(w, h);
+            }
+
+            function drawLaneArrows(w, h) {
+                ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+
+                // Lotus Avenue (Top vertical road, x = 0.34)
+                drawDirectionalChevron(w * 0.34, h * 0.16, "s", "left");
+                drawDirectionalChevron(w * 0.34, h * 0.16, "n", "right");
+
+                // Sunrise Boulevard (Bottom vertical road, x = 0.66)
+                drawDirectionalChevron(w * 0.66, h * 0.84, "n", "left");
+                drawDirectionalChevron(w * 0.66, h * 0.84, "s", "right");
+
+                // Riverfront Road (Right horizontal road, y = 0.34)
+                drawDirectionalChevron(w * 0.84, h * 0.34, "w", "left");
+                drawDirectionalChevron(w * 0.84, h * 0.34, "e", "right");
+
+                // Market Street (Left horizontal road, y = 0.66)
+                drawDirectionalChevron(w * 0.16, h * 0.66, "e", "left");
+                drawDirectionalChevron(w * 0.16, h * 0.66, "w", "right");
+
+                // Central connecting corridors
+                drawDirectionalChevron(w * 0.5, h * 0.34, "w", "left");
+                drawDirectionalChevron(w * 0.5, h * 0.34, "e", "left");
+                drawDirectionalChevron(w * 0.66, h * 0.5, "n", "left");
+                drawDirectionalChevron(w * 0.66, h * 0.5, "s", "left");
+                drawDirectionalChevron(w * 0.5, h * 0.66, "e", "left");
+                drawDirectionalChevron(w * 0.5, h * 0.66, "w", "left");
+                drawDirectionalChevron(w * 0.34, h * 0.5, "s", "left");
+                drawDirectionalChevron(w * 0.34, h * 0.5, "n", "left");
+            }
+
+            function drawDirectionalChevron(x, y, direction, side) {
+                const offset = getLaneOffset(direction, side);
+                drawChevron(ctx, x + offset.x, y + offset.y, direction);
+            }
+
+            function drawChevron(ctx, x, y, dir) {
+                ctx.save();
+                ctx.translate(x, y);
+                if (dir === "s") ctx.rotate(Math.PI / 2);
+                else if (dir === "n") ctx.rotate(-Math.PI / 2);
+                else if (dir === "w") ctx.rotate(Math.PI);
+
+                ctx.beginPath();
+                ctx.moveTo(-4, -3.5);
+                ctx.lineTo(2, 0);
+                ctx.lineTo(-4, 3.5);
+                ctx.lineTo(-2, 0);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
+
+            function drawRoadLabels(w, h) {
+                ctx.font = "700 10px var(--font-main)";
+                ctx.textAlign = "center";
+
+                // Lotus Avenue
+                drawRoadLabelPill(ctx, "LOTUS AVENUE", w * 0.34, 16);
+
+                // Sunrise Boulevard
+                drawRoadLabelPill(ctx, "SUNRISE BOULEVARD", w * 0.66, h - 16);
+
+                // Market Street
+                ctx.save();
+                ctx.translate(16, h * 0.66);
+                ctx.rotate(-Math.PI / 2);
+                drawRoadLabelPill(ctx, "MARKET STREET", 0, 0);
+                ctx.restore();
+
+                // Riverfront Road
+                ctx.save();
+                ctx.translate(w - 16, h * 0.34);
+                ctx.rotate(Math.PI / 2);
+                drawRoadLabelPill(ctx, "RIVERFRONT ROAD", 0, 0);
+                ctx.restore();
+            }
+
+            function drawRoadLabelPill(ctx, text, x, y) {
+                const metrics = ctx.measureText(text);
+                const pw = metrics.width + 12;
+                const ph = 18;
+
+                ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
+                ctx.strokeStyle = "#334155";
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.roundRect(x - pw / 2, y - ph / 2, pw, ph, 4);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = "#cbd5e1";
+                ctx.fillText(text, x, y + 3.5);
+            }
+
+            // 3. Dijkstra Route Highlight (Glowing Overlay)
+            function drawRouteHighlight(w, h) {
+                if (
+                    !highlightedRouteSegments ||
+                    highlightedRouteSegments.length < 2
+                )
+                    return;
+
+                ctx.save();
+                ctx.strokeStyle = "#06b6d4";
+                ctx.lineWidth = 6;
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
+                ctx.shadowColor = "#06b6d4";
+                ctx.shadowBlur = 12;
+
+                ctx.beginPath();
+                highlightedRouteSegments.forEach((jName, idx) => {
+                    const j = JUNCTION_CONFIG[jName];
+                    if (!j) return;
+                    const x = j.x * w;
+                    const y = j.y * h;
+                    if (idx === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 4. Normal Traffic Update & Drawing
+            function updateAndDrawTraffic(dt, w, h) {
+                const roadCounts = {};
+                if (dashboardState && dashboardState.roads) {
+                    dashboardState.roads.forEach((r) => {
+                        roadCounts[r.name] = r.vehicleCount;
+                    });
+                }
+
+                roadLanes.forEach((lane) => {
+                    const count = roadCounts[lane.roadName] ?? 0;
+                    lane.update(dt, count, w, h);
+                    lane.cars.forEach((car) => {
+                        drawCar(ctx, car, false);
+                    });
+                });
+            }
+
+            // 5. Draw Backend Flow Vehicles between Junctions
+            function drawFlowVehicles(w, h) {
+                if (!dashboardState || !dashboardState.flowVehicles) return;
+
+                const now = Date.now();
+                dashboardState.flowVehicles.forEach((flow) => {
+                    const sJunc = JUNCTION_CONFIG[flow.source];
+                    const dJunc = JUNCTION_CONFIG[flow.destination];
+                    if (!sJunc || !dJunc) return;
+
+                    const duration = Math.max(
+                        flow.arrivalAt - flow.startedAt,
+                        1000,
+                    );
+                    const progressNow = Math.min(
+                        1,
+                        Math.max(0, (now - flow.startedAt) / duration),
+                    );
+                    const segKey1 = `${flow.source}-${flow.destination}`;
+                    const isYielding =
+                        activeEmergencyPathSegments.has(segKey1);
+                    const routeMarked =
+                        isYielding ||
+                        dashboardState.emergencySegments?.includes(segKey1) ||
+                        dashboardState.emergencyDestination === flow.destination;
+                    // Marked flow vehicles clear the emergency corridor by
+                    // continuing through it; freezing them creates a blockage.
+                    const progress = progressNow;
+                    haltedFlowProgress.delete(flow.id);
+
+                    if (progress >= 1) return;
+
+                    const sx = sJunc.x * w;
+                    const sy = sJunc.y * h;
+                    const dx = dJunc.x * w;
+                    const dy = dJunc.y * h;
+
+                    const direction = getDirectionFromDelta(dx - sx, dy - sy);
+                    const angle = Math.atan2(dy - sy, dx - sx);
+
+                    // Keep every junction-to-junction vehicle in the same directional lane
+                    // convention as the continuous road traffic.
+                    const offset = getLaneOffset(direction, "left");
+                    let cx = sx + (dx - sx) * progress + offset.x;
+                    let cy = sy + (dy - sy) * progress + offset.y;
+
+                    drawCar(
+                        ctx,
+                        {
+                            x: cx,
+                            y: cy,
+                            angle: angle,
+                            color: "#3b82f6",
+                            yielding: false,
+                        },
+                        flow.emergency,
+                    );
+                });
+            }
+
+            function getDirectionFromDelta(dx, dy) {
+                if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? "e" : "w";
+                return dy >= 0 ? "s" : "n";
+            }
+
+            // 6. Emergency Vehicles Drawing
+            function drawEmergencyVehicles() {
+                activeEmergencyVehicles.forEach((ev) => {
+                    if (ev.progress < 0) return; // Not yet spawned
+                    drawCar(ctx, ev, true);
+                });
+            }
+
+            function drawCar(ctx, car, isEmergency) {
+                ctx.save();
+                ctx.translate(car.x, car.y);
+                ctx.rotate(car.angle);
+
+                const len = isEmergency ? EMERGENCY_LENGTH : CAR_LENGTH;
+                const wid = isEmergency ? EMERGENCY_WIDTH : CAR_WIDTH;
+
+                // Car shadow
+                ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+                ctx.beginPath();
+                ctx.roundRect(-len / 2 + 1, -wid / 2 + 2, len, wid, 2.5);
+                ctx.fill();
+
+                if (isEmergency) {
+                    // Red with bold white outline & blinking lightbar
+                    ctx.fillStyle = "#dc2626";
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 1.6;
+                    ctx.beginPath();
+                    ctx.roundRect(-len / 2, -wid / 2, len, wid, 3);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    const flash = Math.floor(Date.now() / 120) % 2;
+                    ctx.fillStyle = flash ? "#ffffff" : "#38bdf8";
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.strokeStyle = flash
+                        ? "rgba(239, 68, 68, 0.7)"
+                        : "rgba(56, 189, 248, 0.7)";
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 6, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    ctx.fillStyle = "#fef08a";
+                    ctx.fillRect(len / 2 - 1, -wid / 2 + 1, 1.5, 2.5);
+                    ctx.fillRect(len / 2 - 1, wid / 2 - 3.5, 1.5, 2.5);
+                } else {
+                    // Normal Car: Blue-gray body
+                    ctx.fillStyle = car.color || "#475569";
+                    ctx.beginPath();
+                    ctx.roundRect(-len / 2, -wid / 2, len, wid, 2.5);
+                    ctx.fill();
+
+                    // Dark windshield glass
+                    ctx.fillStyle = "#0f172a";
+                    ctx.fillRect(-len / 2 + 4, -wid / 2 + 1.5, 3.5, wid - 3);
+
+                    // Rear window
+                    ctx.fillRect(len / 2 - 4.5, -wid / 2 + 1.5, 2, wid - 3);
+
+                    // Headlights (Front is +len/2)
+                    ctx.fillStyle = "#fef08a";
+                    ctx.fillRect(len / 2 - 1, -wid / 2 + 1, 1.5, 2);
+                    ctx.fillRect(len / 2 - 1, wid / 2 - 3, 1.5, 2);
+
+                    // Taillights (Rear is -len/2)
+                    ctx.fillStyle = "#ef4444";
+                    ctx.fillRect(-len / 2, -wid / 2 + 1, 1, 1.8);
+                    ctx.fillRect(-len / 2, wid / 2 - 2.8, 1, 1.8);
+                }
+
+                ctx.restore();
+
+                // Draw visual YIELD indicator above yielding vehicle
+                if (car.yielding) {
+                    drawYieldBadge(ctx, car.x, car.y);
+                }
+                if (isEmergency && car.blocked) {
+                    drawBlockedBadge(ctx, car.x, car.y);
+                }
+            }
+
+            function drawYieldBadge(ctx, x, y) {
+                ctx.save();
+                ctx.font = "bold 8.5px var(--font-main)";
+                const text = "⚠ YIELD";
+                const tw = ctx.measureText(text).width;
+                const bw = tw + 8;
+                const bh = 14;
+                const bx = x - bw / 2;
+                const by = y - 18;
+
+                ctx.fillStyle = "#ea580c";
+                ctx.beginPath();
+                ctx.roundRect(bx, by, bw, bh, 3);
+                ctx.fill();
+
+                ctx.strokeStyle = "#fef08a";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                ctx.fillStyle = "#ffffff";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(text, x, by + bh / 2);
+                ctx.restore();
+            }
+
+            function drawBlockedBadge(ctx, x, y) {
+                ctx.save();
+                const pulse = 0.75 + Math.sin(Date.now() / 120) * 0.25;
+                ctx.globalAlpha = pulse;
+                ctx.strokeStyle = "#fb923c";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(x, y, 15, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.font = "bold 8.5px var(--font-main)";
+                const text = "BLOCKED";
+                const tw = ctx.measureText(text).width;
+                const bx = x - (tw + 8) / 2;
+                const by = y - 28;
+                ctx.fillStyle = "#c2410c";
+                ctx.beginPath();
+                ctx.roundRect(bx, by, tw + 8, 14, 3);
+                ctx.fill();
+                ctx.fillStyle = "#fff7ed";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(text, x, by + 7);
+                ctx.restore();
+            }
+
+            // 7. Traffic Signals (3 Stacked Circles at Each Junction)
+            function drawTrafficSignals(w, h) {
+                Object.keys(JUNCTION_CONFIG).forEach((jName) => {
+                    const j = JUNCTION_CONFIG[jName];
+                    const jx = j.x * w;
+                    const jy = j.y * h;
+
+                    let isGreen = false;
+                    let greenTime = 0;
+                    if (dashboardState && dashboardState.roads) {
+                        const roadData = dashboardState.roads.find(
+                            (r) => r.name === j.road,
+                        );
+                        if (
+                            roadData &&
+                            roadData.vehicleCount > 0 &&
+                            roadData.greenLightTime > 0
+                        ) {
+                            isGreen = true;
+                            greenTime = roadData.greenLightTime;
+                        }
+                    }
+
+                    const sigX = jx - 48;
+                    const sigY = jy - 14;
+                    const sigW = 10;
+                    const sigH = 26;
+
+                    ctx.fillStyle = "#111827";
+                    ctx.strokeStyle = "#374151";
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.roundRect(sigX, sigY, sigW, sigH, 3);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    const radius = 2.8;
+                    const cx = sigX + sigW / 2;
+
+                    // Red light (Top)
+                    ctx.fillStyle = !isGreen ? "#ef4444" : "#381616";
+                    if (!isGreen) {
+                        ctx.shadowColor = "#ef4444";
+                        ctx.shadowBlur = 6;
+                    }
+                    ctx.beginPath();
+                    ctx.arc(cx, sigY + 5.5, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+
+                    // Yellow light (Middle)
+                    ctx.fillStyle = "#383016";
+                    ctx.beginPath();
+                    ctx.arc(cx, sigY + 13, radius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Green light (Bottom)
+                    ctx.fillStyle = isGreen ? "#10b981" : "#143825";
+                    if (isGreen) {
+                        ctx.shadowColor = "#10b981";
+                        ctx.shadowBlur = 8;
+                    }
+                    ctx.beginPath();
+                    ctx.arc(cx, sigY + 20.5, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                });
+            }
+
+            // 8. Labeled Junction Boxes with Vehicle Count Badges
+            function drawJunctionBoxes(w, h) {
+                Object.keys(JUNCTION_CONFIG).forEach((jName) => {
+                    const j = JUNCTION_CONFIG[jName];
+                    const x = j.x * w;
+                    const y = j.y * h;
+
+                    let waitingCount = 0;
+                    if (dashboardState && dashboardState.junctionStatuses) {
+                        const status = dashboardState.junctionStatuses.find(
+                            (js) => js.name === jName,
+                        );
+                        if (status) waitingCount = status.vehicleCount;
+                    }
+
+                    const boxW = 86;
+                    const boxH = 30;
+                    const bx = x - boxW / 2;
+                    const by = y - boxH / 2;
+
+                    ctx.fillStyle = "rgba(17, 24, 39, 0.94)";
+                    ctx.strokeStyle = waitingCount > 0 ? "#3b82f6" : "#374151";
+                    ctx.lineWidth = 1.2;
+                    ctx.beginPath();
+                    ctx.roundRect(bx, by, boxW, boxH, 5);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.fillStyle = "#94a3b8";
+                    ctx.font = "700 8px var(--font-main)";
+                    ctx.textAlign = "center";
+                    ctx.fillText(j.label, x, by + 10.5);
+
+                    ctx.fillStyle = waitingCount > 0 ? "#38bdf8" : "#64748b";
+                    ctx.font = "700 9px var(--font-mono)";
+                    ctx.fillText(`${waitingCount} waiting`, x, by + 22.5);
+                });
+            }
+
+            // --- Dashboard & UI Synchronization ---
+            function render(data) {
+                dashboardState = data;
+
+                // 1. Update Live Stats Row
+                const totalWaiting = (data.roads || []).reduce(
+                    (sum, r) => sum + r.vehicleCount,
+                    0,
+                );
+                $("statWaitingVehicles").innerHTML =
+                    `${totalWaiting} <span class="stat-sub">cars</span>`;
+
+                // 2. Render Road Inputs Grid (preserve typing focus)
+                const isEditingInputs =
+                    document.activeElement &&
+                    document.activeElement.classList.contains("road-count");
+                if (!isEditingInputs) {
+                    $("roadInputs").innerHTML = (data.roads || [])
+                        .map((r) => {
+                            const val = trafficDraft[r.name] ?? r.vehicleCount;
+                            return `
+        <div class="form-group">
+          <label for="input-${r.name}">${r.name}</label>
+          <input class="road-count" id="input-${r.name}" data-road="${r.name}" type="number" min="0" value="${val}" />
+        </div>
+      `;
+                        })
+                        .join("");
+                }
+
+                // 3. Populate Road Selection for Emergency
+                const roadSelect = $("road");
+                const currentSelectedRoad = roadSelect.value;
+                if (!roadSelect.options.length && data.roads) {
+                    roadSelect.innerHTML = data.roads
+                        .map(
+                            (r) =>
+                                `<option value="${r.name}">${r.name}</option>`,
+                        )
+                        .join("");
+                }
+                if (
+                    currentSelectedRoad &&
+                    [...roadSelect.options].some(
+                        (o) => o.value === currentSelectedRoad,
+                    )
+                ) {
+                    roadSelect.value = currentSelectedRoad;
+                }
+
+                // 4. Render Live Signal Table
+                $("trafficTable").innerHTML = (data.roads || [])
+                    .map((r) => {
+                        let statusBadge =
+                            '<span class="status-badge cleared">CLEARED</span>';
+                        if (r.vehicleCount > 0) {
+                            statusBadge =
+                                r.greenLightTime > 0
+                                    ? '<span class="status-badge green">GREEN ACTIVE</span>'
+                                    : '<span class="status-badge waiting">QUEUED</span>';
+                        }
+                        return `
+      <tr>
+        <td><div class="road-cell"><b>${r.name}</b></div></td>
+        <td><span style="font-family: var(--font-mono); font-weight: 700;">${r.vehicleCount}</span></td>
+        <td><span style="font-family: var(--font-mono); color: #60a5fa;">${r.greenLightTime.toFixed(1)}s</span></td>
+        <td>${statusBadge}</td>
+      </tr>
+    `;
+                    })
+                    .join("");
+
+                // 5. Render Initial Traffic Plan Table
+                const initialPlan = data.initialTrafficPlan || [];
+                $("initialTrafficTable").innerHTML = initialPlan
+                    .map(
+                        (r) => `
+    <tr>
+      <td><div class="road-cell"><b>${r.name}</b></div></td>
+      <td><span style="font-family: var(--font-mono); font-weight: 700;">${r.vehicleCount}</span></td>
+      <td><span style="font-family: var(--font-mono); color: #60a5fa;">${r.greenLightTime.toFixed(1)}s</span></td>
+    </tr>
+  `,
+                    )
+                    .join("");
+
+                // 6. Render Dispatch History
+                const dispatches = data.dispatches || [];
+                if (dispatches.length > 0) {
+                    $("dispatches").innerHTML = dispatches
+                        .map((d) => {
+                            const severityClass = `severity-${d.severity || 1}`;
+                            const pathText = d.routeFound
+                                ? d.path.join(" → ")
+                                : "No valid route";
+                            return `
+        <div class="history-item">
+          <div class="history-top">
+            <span class="history-vehicle">
+              <span>🚨</span>
+              <span>${d.vehicleId}</span>
+            </span>
+            <span class="severity-badge ${severityClass}">LEVEL ${d.severity}</span>
+          </div>
+          <div class="history-route">${pathText}</div>
+          <div style="font-size: 0.7rem; color: var(--text-dim); display: flex; justify-content: space-between;">
+            <span>Dest: ${d.destination}</span>
+            <span style="font-family: var(--font-mono);">${d.travelTime ? d.travelTime.toFixed(1) : 0} min</span>
+          </div>
+        </div>
+      `;
+                        })
+                        .join("");
+                } else {
+                    $("dispatches").innerHTML =
+                        '<div class="empty-state">No emergency vehicles dispatched yet.</div>';
+                }
+            }
+
+            // Track input changes for draft preservation
+            $("roadInputs").addEventListener("input", (e) => {
+                if (e.target.classList.contains("road-count")) {
+                    trafficDraft[e.target.dataset.road] = e.target.value;
+                }
+            });
+
+            // Tab Switcher for Traffic Plan
+            $("tabLivePlan").onclick = () => {
+                $("tabLivePlan").classList.add("active");
+                $("tabInitialPlan").classList.remove("active");
+                $("liveTableWrap").style.display = "block";
+                $("initialTableWrap").style.display = "none";
+            };
+
+            $("tabInitialPlan").onclick = () => {
+                $("tabInitialPlan").classList.add("active");
+                $("tabLivePlan").classList.remove("active");
+                $("initialTableWrap").style.display = "block";
+                $("liveTableWrap").style.display = "none";
+            };
+
+            // --- API Action Handlers ---
+
+            // 1. Update Traffic Counts
+            $("trafficButton").onclick = async () => {
+                const btn = $("trafficButton");
+                try {
+                    const vehicleCounts = {};
+                    document.querySelectorAll(".road-count").forEach((inp) => {
+                        const val = inp.value.trim();
+                        if (val === "")
+                            throw new Error(
+                                `${inp.dataset.road} count is required.`,
+                            );
+                        const count = Number(val);
+                        if (!Number.isInteger(count) || count < 0) {
+                            throw new Error(
+                                `${inp.dataset.road} must be a non-negative whole number.`,
+                            );
+                        }
+                        vehicleCounts[inp.dataset.road] = count;
+                    });
+
+                    btn.disabled = true;
+                    btn.textContent = "Updating Plan...";
+
+                    const updated = await request("/traffic", {
+                        method: "PUT",
+                        body: JSON.stringify({ vehicleCounts }),
+                    });
+
+                    trafficDraft = {};
+                    render(updated);
+                    showToast(
+                        "Traffic Updated",
+                        "Green light plan recalculated and applied successfully.",
+                        "success",
+                    );
+                } catch (err) {
+                    showToast("Update Failed", err.message, "error");
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = "Update Green Light Plan";
+                }
+            };
+
+            // 2. Dispatch Emergency Vehicle
+            $("dispatchButton").onclick = async () => {
+                const btn = $("dispatchButton");
+                try {
+                    const id = $("vehicleId").value.trim();
+                    const severity = Number($("severity").value);
+                    const count = Number($("emergencyCount").value);
+                    const road = $("road").value;
+                    const destination = $("destination").value;
+
+                    if (!id)
+                        throw new Error("Emergency Vehicle ID is required.");
+                    if (!Number.isInteger(count) || count < 1)
+                        throw new Error("Vehicle count must be at least 1.");
+
+                    btn.disabled = true;
+                    btn.textContent = "Preempting Route...";
+
+                    const result = await request("/emergency", {
+                        method: "POST",
+                        body: JSON.stringify({
+                            id,
+                            severity,
+                            road,
+                            emergencyCount: count,
+                            destination,
+                        }),
+                    });
+
+                    if (!spawnEmergencyConvoy(road, result, count)) {
+                        throw new Error(
+                            `No viable priority route found for ${id} to ${destination}.`,
+                        );
+                    }
+
+                    const current = await request("/dashboard");
+                    render(current);
+
+                    showToast(
+                        "Emergency Dispatched",
+                        `${id} priority corridor opened. Affected segments yielding.`,
+                        "success",
+                    );
+                } catch (err) {
+                    showToast("Dispatch Error", err.message, "error");
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = "Dispatch & Preempt Corridor";
+                }
+            };
+
+            // --- Real-Time SSE Stream with Auto-Reconnect ---
+            let sseSource = null;
+            function initStream() {
+                if (sseSource) {
+                    sseSource.close();
+                }
+
+                sseSource = new EventSource(`${api}/stream`);
+
+                sseSource.addEventListener("traffic-update", (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        render(data);
+                        $("streamStatus").className = "connection-status";
+                        $("streamStatusText").textContent = "SSE Stream Live";
+                    } catch (e) {
+                        console.error("SSE JSON parse error:", e);
+                    }
+                });
+
+                sseSource.onerror = () => {
+                    $("streamStatus").className = "connection-status offline";
+                    $("streamStatusText").textContent = "Reconnecting...";
+                    sseSource.close();
+                    setTimeout(initStream, 3000);
+                };
+            }
+
+            // Initial Data Load & Engine Start
+            request("/dashboard")
+                .then((data) => render(data))
+                .catch((err) =>
+                    showToast(
+                        "Connection Notice",
+                        "Connecting to backend traffic service...",
+                        "info",
+                    ),
+                );
+
+            initStream();
+
+            // Start high-performance animation loop (running at all times)
+            requestAnimationFrame(renderSimulation);
+        </script>
+    </body>
+</html>
